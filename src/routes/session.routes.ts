@@ -14,7 +14,12 @@ import {
   startSession,
   endSession,
 } from '../controllers/session.controller';
+import {
+  getSessionAnalytics,
+  getStudentTimeSeries,
+} from '../controllers/analytics.controller';
 import { protect, requireRole } from '../middleware/auth.middleware';
+
 
 const router = Router();
 
@@ -89,6 +94,52 @@ router.post('/', requireRole('instructor', 'admin'), createSession);
  *       404:
  *         description: Not found
  */
+/**
+ * @swagger
+ * /api/sessions/{id}/analytics:
+ *   get:
+ *     summary: Get engagement analytics for a completed session
+ *     tags: [Sessions]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Analytics payload (timeSeries + students)
+ *       404:
+ *         description: Session not found
+ */
+router.get('/:sessionId/analytics', getSessionAnalytics);
+
+/**
+ * @swagger
+ * /api/sessions/{id}/analytics/student/{studentId}:
+ *   get:
+ *     summary: Get per-student engagement time series (instructor only)
+ *     tags: [Sessions]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *       - in: path
+ *         name: studentId
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Time-series array for the student
+ *       403:
+ *         description: Instructor access required
+ */
+router.get('/:sessionId/analytics/student/:studentId', getStudentTimeSeries);
+
 router.get('/:id', getSessionById);
 
 /**
