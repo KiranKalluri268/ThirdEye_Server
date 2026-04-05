@@ -1,0 +1,14 @@
+{
+  "name": "thirdeye-server",
+  "version": "1.0.0",
+  "description": "ThirdEye backend — Node.js + Express + Socket.IO + MongoDB",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "nodemon --exec ts-node src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
