@@ -129,6 +129,24 @@ const registerRoomHandlers = (io: Server, socket: Socket): void => {
   });
 
   /**
+   * @description Phase 2: relays a student's latest engagement label to all other
+   *              peers in the room (primarily the instructor's client).
+   *              Called after every successful save-record POST (~every 3 seconds).
+   *              This event is ephemeral — no database write occurs here.
+   * @param roomCode       - The current room code
+   * @param engagementLevel - The student's latest engagement label
+   */
+  socket.on('engagement-update', ({ roomCode, engagementLevel }: {
+    roomCode: string; engagementLevel: string;
+  }) => {
+    // socket.to() excludes the sender — only other room members receive this
+    socket.to(roomCode).emit('peer-engagement', {
+      socketId:        socket.id,
+      engagementLevel,
+    });
+  });
+
+  /**
    * @description Instructor-only: ends the session for all participants.
    *              Broadcasts 'session-ended' to every peer in the room then
    *              cleans up the room map entry.
