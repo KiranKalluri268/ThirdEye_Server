@@ -14,7 +14,7 @@ import User, { IUser } from '../models/User';
 const COOKIE_OPTIONS = {
   httpOnly: true,
   secure:   process.env.NODE_ENV === 'production',
-  sameSite: 'lax' as const,
+  sameSite: (process.env.NODE_ENV === 'production' ? 'none' : 'lax') as 'none' | 'lax',
   maxAge:   7 * 24 * 60 * 60 * 1000, // 7 days in ms
 };
 
@@ -147,6 +147,10 @@ export const getMe = async (req: Request, res: Response): Promise<void> => {
  * @param res - Response: { success, message }
  */
 export const logout = (_req: Request, res: Response): void => {
-  res.clearCookie('token', { httpOnly: true, sameSite: 'lax' });
+  res.clearCookie('token', { 
+    httpOnly: true, 
+    sameSite: (process.env.NODE_ENV === 'production' ? 'none' : 'lax') as 'none' | 'lax',
+    secure:   process.env.NODE_ENV === 'production'
+  });
   res.json({ success: true, message: 'Logged out' });
 };
