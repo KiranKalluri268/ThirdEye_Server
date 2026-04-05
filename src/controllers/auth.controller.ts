@@ -76,6 +76,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
     res.status(201).json({
       success: true,
+      token,
       user: { _id: user._id, name: user.name, email: user.email, role: user.role, avatarColor: user.avatarColor },
     });
   } catch (error) {
@@ -115,6 +116,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
     res.json({
       success: true,
+      token,
       user: { _id: user._id, name: user.name, email: user.email, role: user.role, avatarColor: user.avatarColor },
     });
   } catch (error) {

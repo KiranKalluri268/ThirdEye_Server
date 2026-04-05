@@ -32,7 +32,7 @@ declare global {
  * @returns {void} Sends 401 if token is missing or invalid
  */
 const protect = (req: Request, res: Response, next: NextFunction): void => {
-  const token = req.cookies?.token as string | undefined;
+  const token = req.cookies?.token || (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.split(' ')[1] : undefined);
 
   if (!token) {
     res.status(401).json({ success: false, message: 'Not authenticated' });
