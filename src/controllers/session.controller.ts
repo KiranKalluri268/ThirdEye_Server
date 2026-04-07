@@ -73,7 +73,7 @@ export const getSessions = async (req: Request, res: Response): Promise<void> =>
       // Students see all non-expired sessions
       sessions = await Session.find({ status: { $ne: SessionStatus.EXPIRED } })
         .populate('instructor', 'name email avatarColor')
-        .sort({ startTime: 1 });
+        .sort({ createdAt: -1 });
     }
 
     res.json({ success: true, sessions });

@@ -26,6 +26,7 @@ interface PeerInfo {
   displayName: string;
   isMuted:     boolean;
   isCamOff:    boolean;
+  isHandRaised: boolean;
 }
 
 /**
@@ -68,10 +69,11 @@ const registerRoomHandlers = (io: Server, socket: Socket): void => {
       displayName,
       isMuted:  false,
       isCamOff: false,
+      isHandRaised: false,
     });
 
     // Add the new peer to the room map
-    room.set(socket.id, { socketId: socket.id, userId, displayName, isMuted: false, isCamOff: false });
+    room.set(socket.id, { socketId: socket.id, userId, displayName, isMuted: false, isCamOff: false, isHandRaised: false });
 
     // Store roomCode on socket for cleanup on disconnect
     (socket as unknown as Record<string, unknown>)['roomCode'] = roomCode;
@@ -144,6 +146,25 @@ const registerRoomHandlers = (io: Server, socket: Socket): void => {
       socketId:        socket.id,
       engagementLevel,
     });
+  });
+
+  /**
+   * @description Broadcasts hand-raised state dynamically targeting the UI.
+   */
+  socket.on('hand-raised', ({ roomCode }: { roomCode: string }) => {
+    const room = rooms.get(roomCode);
+    if (room?.has(socket.id)) {
+      room.get(socket.id)!.isHandRaised = true;
+    }
+    socket.to(roomCode).emit('peer-hand-raised', { socketId: socket.id });
+  });
+
+  socket.on('hand-lowered', ({ roomCode }: { roomCode: string }) => {
+    const room = rooms.get(roomCode);
+    if (room?.has(socket.id)) {
+      room.get(socket.id)!.isHandRaised = false;
+    }
+    socket.to(roomCode).emit('peer-hand-lowered', { socketId: socket.id });
   });
 
   socket.on('set-screen-stream', ({ roomCode, screenStreamId }: { roomCode: string, screenStreamId: string }) => {
