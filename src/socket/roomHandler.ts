@@ -146,6 +146,10 @@ const registerRoomHandlers = (io: Server, socket: Socket): void => {
     });
   });
 
+  socket.on('set-screen-stream', ({ roomCode, screenStreamId }: { roomCode: string, screenStreamId: string }) => {
+    socket.to(roomCode).emit('set-screen-stream', { socketId: socket.id, screenStreamId });
+  });
+
   /**
    * @description Instructor-only: ends the session for all participants.
    *              Broadcasts 'session-ended' to every peer in the room then
