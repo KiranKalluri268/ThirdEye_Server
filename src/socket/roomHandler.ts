@@ -215,6 +215,24 @@ const registerRoomHandlers = (io: Server, socket: Socket): void => {
   });
 
   /**
+   * @description Instructor broadcasts a force-unmute to ALL peers in the room.
+   */
+  socket.on('force-unmute-all', ({ roomCode, kind }: { roomCode: string; kind: 'audio' | 'video' }) => {
+    socket.to(roomCode).emit('instructor-force-unmute', { kind });
+    console.log(`[Room] Instructor force-unmuted all: kind=${kind} in ${roomCode}`);
+  });
+
+  /**
+   * @description Instructor unmutes a specific peer by their socket ID.
+   */
+  socket.on('force-unmute-peer', ({ roomCode, targetSocketId, kind }: {
+    roomCode: string; targetSocketId: string; kind: 'audio' | 'video';
+  }) => {
+    io.to(targetSocketId).emit('instructor-force-unmute', { kind });
+    console.log(`[Room] Instructor force-unmuted peer ${targetSocketId}: kind=${kind}`);
+  });
+
+  /**
    * @description Instructor-only: ends the session for all participants.
    *              Broadcasts 'session-ended' to every peer in the room then
    *              cleans up the room map entry.
