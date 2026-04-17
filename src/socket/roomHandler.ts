@@ -35,6 +35,10 @@ interface PeerInfo {
  */
 const rooms = new Map<string, Map<string, PeerInfo>>();
 
+/** Per-room instructor permission state */
+interface RoomPermissions { allowUnmute: boolean; allowCamToggle: boolean; }
+const roomPermissions = new Map<string, RoomPermissions>();
+
 /**
  * @description Registers all WebRTC signaling event listeners for a connected socket.
  *              Called once per socket connection in the /room namespace.
@@ -61,6 +65,10 @@ const registerRoomHandlers = (io: Server, socket: Socket): void => {
     // Send the joining peer the list of existing peers
     const existingPeers = Array.from(room.values());
     socket.emit('peers', { peers: existingPeers });
+
+    // Send the joining peer the current room permissions (so students know if mic is locked)
+    const perms = roomPermissions.get(roomCode) ?? { allowUnmute: false, allowCamToggle: false };
+    socket.emit('permissions-updated', perms);
 
     // Notify existing peers about the new joiner
     socket.to(roomCode).emit('peer-joined', {
@@ -172,6 +180,41 @@ const registerRoomHandlers = (io: Server, socket: Socket): void => {
   });
 
   /**
+   * @description Instructor updates class-wide media permissions.
+   *              Persists to room state and broadcasts to all room members (incl. instructor).
+   */
+  socket.on('set-permissions', ({ roomCode, allowUnmute, allowCamToggle }: {
+    roomCode: string; allowUnmute: boolean; allowCamToggle: boolean;
+  }) => {
+    roomPermissions.set(roomCode, { allowUnmute, allowCamToggle });
+    io.to(roomCode).emit('permissions-updated', { allowUnmute, allowCamToggle });
+    console.log(`[Room] Permissions updated for ${roomCode}: unmute=${allowUnmute} cam=${allowCamToggle}`);
+  });
+
+  /**
+   * @description Instructor broadcasts a force-mute to ALL peers in the room.
+   * @param roomCode - The current room code
+   * @param kind     - 'audio' or 'video'
+   */
+  socket.on('force-mute-all', ({ roomCode, kind }: { roomCode: string; kind: 'audio' | 'video' }) => {
+    socket.to(roomCode).emit('instructor-force-mute', { kind });
+    console.log(`[Room] Instructor force-muted all: kind=${kind} in ${roomCode}`);
+  });
+
+  /**
+   * @description Instructor mutes a specific peer by their socket ID.
+   * @param roomCode       - The current room code
+   * @param targetSocketId - Socket ID of the target student
+   * @param kind           - 'audio' or 'video'
+   */
+  socket.on('force-mute-peer', ({ roomCode, targetSocketId, kind }: {
+    roomCode: string; targetSocketId: string; kind: 'audio' | 'video';
+  }) => {
+    io.to(targetSocketId).emit('instructor-force-mute', { kind });
+    console.log(`[Room] Instructor force-muted peer ${targetSocketId}: kind=${kind}`);
+  });
+
+  /**
    * @description Instructor-only: ends the session for all participants.
    *              Broadcasts 'session-ended' to every peer in the room then
    *              cleans up the room map entry.
@@ -179,6 +222,7 @@ const registerRoomHandlers = (io: Server, socket: Socket): void => {
   socket.on('end-session', ({ roomCode }: { roomCode: string }) => {
     io.to(roomCode).emit('session-ended');
     rooms.delete(roomCode);
+    roomPermissions.delete(roomCode);
     console.log(`[Room] Session ended: ${roomCode}`);
   });
 
