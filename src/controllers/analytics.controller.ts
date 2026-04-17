@@ -1,5 +1,16 @@
 /**
  * @file analytics.controller.ts
+ * @description REST handlers for Phase 2.1 and Phase 2.5 session analytics.
+ *
+ *              Endpoints:
+ *               1. GET /api/sessions/:sessionId/analytics
+ *               2. GET /api/sessions/:sessionId/analytics/student/:studentId
+ *               3. GET /api/sessions/:sessionId/analytics/heatmap  (Phase 2.5)
+ */
+
+// (Original file-level JSDoc below is intentionally replaced by the above)
+/**
+ * @file analytics.controller.ts
  * @description REST handlers for Phase 2.1 session analytics.
  *
  *              Two endpoints:
@@ -288,6 +299,112 @@ export const getStudentTimeSeries = async (req: Request, res: Response): Promise
     res.json({ success: true, series });
   } catch (err) {
     console.error('[Analytics] getStudentTimeSeries error:', err);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
+
+// ── GET /api/sessions/:sessionId/analytics/heatmap ───────────────────────────
+
+/**
+ * @description Returns a sparse student × minute engagement matrix for the
+ *              instructor heatmap view.
+ *
+ *              Each cell contains the average confidence score and dominant
+ *              engagement label for that (student, minute) bucket. Minutes
+ *              with no records for a given student are omitted (sparse).
+ *
+ *              Access control: instructor only.
+ *
+ * @param req.params.sessionId - MongoDB ObjectId of the session
+ * @returns {200} { success, minutes: string[], rows: HeatmapRow[] }
+ * @returns {403} If not instructor
+ * @returns {404} If session not found
+ */
+export const getHeatmapData = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { sessionId } = req.params;
+    const sessionIdStr  = sessionId as string;
+    const userRole      = (req as any).user.role as string;
+    const isInstructor  = userRole === 'instructor' || userRole === 'admin';
+
+    if (!isInstructor) {
+      res.status(403).json({ success: false, message: 'Instructor access required' });
+      return;
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(sessionIdStr)) {
+      res.status(400).json({ success: false, message: 'Invalid session ID' });
+      return;
+    }
+
+    const session = await Session.findById(sessionIdStr).select('startTime').lean();
+    if (!session) {
+      res.status(404).json({ success: false, message: 'Session not found' });
+      return;
+    }
+
+    // ── Step 1: group by (student, minute) ──────────────────────────────────
+    const raw = await EngagementRecord.aggregate([
+      { $match: { session: new mongoose.Types.ObjectId(sessionIdStr) } },
+      {
+        $group: {
+          _id: {
+            student: '$student',
+            minute: {
+              $dateToString: {
+                format: '%Y-%m-%dT%H:%M:00.000Z',
+                date:   '$timestamp',
+              },
+            },
+          },
+          avgScore:      { $avg:  '$confidenceScore' },
+          dominantLabel: { $last: '$engagementLevel' },
+        },
+      },
+      // ── Step 2: group by student, collect minute cells into an array ─────
+      {
+        $group: {
+          _id:   '$_id.student',
+          cells: {
+            $push: {
+              minute: '$_id.minute',
+              score:  { $round: ['$avgScore', 3] },
+              label:  '$dominantLabel',
+            },
+          },
+        },
+      },
+      // ── Step 3: join user names ──────────────────────────────────────────
+      {
+        $lookup: {
+          from:         'users',
+          localField:   '_id',
+          foreignField: '_id',
+          as:           'userInfo',
+        },
+      },
+      { $sort: { '_id': 1 } },
+    ]);
+
+    // ── Collect the full sorted set of minutes across all students ────────
+    const minuteSet = new Set<string>();
+    raw.forEach((row) => {
+      (row.cells as { minute: string }[]).forEach((c) => minuteSet.add(c.minute));
+    });
+    const minutes = Array.from(minuteSet).sort();
+
+    // ── Build response rows ───────────────────────────────────────────────
+    const rows = raw.map((row) => ({
+      userId: (row._id as mongoose.Types.ObjectId).toString(),
+      name:   (row.userInfo as any[])[0]?.name ?? 'Unknown',
+      cells:  (row.cells as { minute: string; score: number; label: string }[]).sort(
+        (a, b) => a.minute.localeCompare(b.minute)
+      ),
+    }));
+
+    res.json({ success: true, minutes, rows });
+  } catch (err) {
+    console.error('[Analytics] getHeatmapData error:', err);
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 };

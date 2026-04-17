@@ -17,6 +17,7 @@ import {
 import {
   getSessionAnalytics,
   getStudentTimeSeries,
+  getHeatmapData,
 } from '../controllers/analytics.controller';
 import { protect, requireRole } from '../middleware/auth.middleware';
 
@@ -139,6 +140,27 @@ router.get('/:sessionId/analytics', getSessionAnalytics);
  *         description: Instructor access required
  */
 router.get('/:sessionId/analytics/student/:studentId', getStudentTimeSeries);
+
+/**
+ * @swagger
+ * /api/sessions/{id}/analytics/heatmap:
+ *   get:
+ *     summary: Get student × minute engagement heatmap matrix (instructor only)
+ *     tags: [Sessions]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Sparse heatmap matrix (minutes[] + rows[])
+ *       403:
+ *         description: Instructor access required
+ */
+router.get('/:sessionId/analytics/heatmap', getHeatmapData);
 
 router.get('/:id', getSessionById);
 
