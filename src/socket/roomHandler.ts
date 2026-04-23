@@ -91,9 +91,14 @@ const registerRoomHandlers = (io: Server, socket: Socket): void => {
 
   /**
    * @description Relays a WebRTC SDP offer to a specific target peer.
+   *              Includes the sender's displayName (from room state) so the
+   *              receiver can always resolve the name — even if `peer-joined`
+   *              hasn't been processed yet on their end.
    */
   socket.on('offer', ({ to, sdp }: { to: string; sdp: object }) => {
-    io.to(to).emit('offer', { from: socket.id, sdp });
+    const roomCode = (socket as unknown as Record<string, unknown>)['roomCode'] as string | undefined;
+    const senderName = roomCode ? rooms.get(roomCode)?.get(socket.id)?.displayName : undefined;
+    io.to(to).emit('offer', { from: socket.id, sdp, displayName: senderName ?? '' });
   });
 
   /**
