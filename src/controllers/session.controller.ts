@@ -9,6 +9,7 @@ import { Request, Response } from 'express';
 import crypto from 'crypto';
 import Session, { SessionStatus } from '../models/Session';
 import Room from '../models/Room';
+import EngagementRecord from '../models/EngagementRecord';
 
 /**
  * @description Generates a unique, human-readable room code in the format
@@ -70,8 +71,18 @@ export const getSessions = async (req: Request, res: Response): Promise<void> =>
         .populate('instructor', 'name email avatarColor')
         .sort({ createdAt: -1 });
     } else {
-      // Students see all non-expired sessions
-      sessions = await Session.find({ status: { $ne: SessionStatus.EXPIRED } })
+      // Find all sessions where this student has an engagement record
+      const participatedSessionIds = await EngagementRecord.distinct('session', { student: userId });
+
+      // Students see all active/scheduled sessions.
+      // But for completed sessions, they only see ones they participated in.
+      sessions = await Session.find({
+        status: { $ne: SessionStatus.EXPIRED },
+        $or: [
+          { status: { $in: [SessionStatus.SCHEDULED, SessionStatus.ACTIVE] } },
+          { status: SessionStatus.COMPLETED, _id: { $in: participatedSessionIds } }
+        ]
+      })
         .populate('instructor', 'name email avatarColor')
         .sort({ createdAt: -1 });
     }
