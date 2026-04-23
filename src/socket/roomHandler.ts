@@ -18,6 +18,7 @@
  */
 
 import { Server, Socket } from 'socket.io';
+import Session            from '../models/Session';
 
 /** Information stored for each connected peer */
 interface PeerInfo {
@@ -85,6 +86,24 @@ const registerRoomHandlers = (io: Server, socket: Socket): void => {
 
     // Store roomCode on socket for cleanup on disconnect
     (socket as unknown as Record<string, unknown>)['roomCode'] = roomCode;
+
+    /**
+     * Auto-enroll the joining user in the session's enrolledStudents list.
+     * - Uses $addToSet so the operation is idempotent (safe on reconnects).
+     * - Skips the instructor: the session's `instructor` field is excluded so
+     *   analytics heatmap rows only ever contain actual students.
+     * - Fire-and-forget: never blocks the join event flow.
+     */
+    Session.findOneAndUpdate(
+      {
+        roomCode,
+        instructor: { $ne: userId },            // do not enroll the instructor
+        enrolledStudents: { $ne: userId },       // skip if already enrolled
+      },
+      { $addToSet: { enrolledStudents: userId } }
+    ).catch((err: unknown) => {
+      console.warn('[Room] Auto-enroll failed for', userId, '—', err);
+    });
 
     console.log(`[Room] ${displayName} joined ${roomCode} (${room.size} peers)`);
   });
