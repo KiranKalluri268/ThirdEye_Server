@@ -46,7 +46,7 @@ sequenceDiagram
     B->>A: POST /api/auth/login
     A->>D: Find user and verify bcrypt hash
     D-->>A: User
-    A-->>B: User + JWT; set httpOnly cookie
+    A-->>B: Return user and JWT in httpOnly cookie
     B->>A: Protected request with cookie or Bearer token
     A->>A: Verify JWT and required role
     A->>D: Read or mutate data
@@ -129,4 +129,3 @@ erDiagram
 - Socket.IO currently does not verify a JWT handshake or independently authorize instructor-only events. Harden it by authenticating the handshake, binding verified identity and role to `socket.data`, validating payload schemas, and checking room membership and ownership for each event.
 - Chat sender identity currently comes from the event payload and should instead come from verified socket state.
 - Rate limiting, structured validation, CSRF protection, shared real-time state, and automated tests are not currently present and should be considered before an untrusted production launch.
-
