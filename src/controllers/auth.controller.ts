@@ -146,17 +146,31 @@ export const googleLogin = async (req: Request, res: Response): Promise<void> =>
     }
     let user = await User.findOne({ googleId: profile.sub });
     if (!user) {
-      if (await User.exists({ email: profile.email.toLowerCase() })) {
-        res.status(409).json({ success: false, message: 'An account with this email already exists. Sign in with your password.' });
-        return;
+      const email = profile.email.toLowerCase();
+      const existing = await User.findOne({ email });
+      if (existing) {
+        if (existing.googleId && existing.googleId !== profile.sub) {
+          res.status(409).json({ success: false, message: 'This account is linked to a different Google account' });
+          return;
+        }
+        user = existing.googleId ? existing : await User.findOneAndUpdate(
+          { _id: existing._id, googleId: { $exists: false } },
+          { $set: { googleId: profile.sub } },
+          { new: true }
+        );
+        if (!user) {
+          res.status(409).json({ success: false, message: 'This account was linked to another Google account' });
+          return;
+        }
+      } else {
+        user = await User.create({
+          name: profile.name || email.split('@')[0],
+          email,
+          googleId: profile.sub,
+          role: 'student',
+          avatarColor: generateAvatarColor(),
+        });
       }
-      user = await User.create({
-        name: profile.name || profile.email.split('@')[0],
-        email: profile.email,
-        googleId: profile.sub,
-        role: 'student',
-        avatarColor: generateAvatarColor(),
-      });
     }
     const token = signToken(user._id.toString(), user.role);
     res.cookie('token', token, COOKIE_OPTIONS);

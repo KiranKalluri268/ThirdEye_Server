@@ -90,7 +90,7 @@ Mongoose creates collections and declared indexes as models are used. Production
 
 ## Authentication and authorization
 
-Google sign-in uses a Google OAuth Web application client ID. Configure its consent screen and add the frontend origin, such as `http://localhost:5173`, under Authorized JavaScript origins. Set that client ID in the server's `GOOGLE_CLIENT_ID` and the client's `VITE_GOOGLE_CLIENT_ID`. Google accounts are created with the student role. If the email already belongs to a password account, the user must sign in with their password; accounts are not linked automatically.
+Google sign-in uses a Google OAuth Web application client ID. Configure its consent screen and add the frontend origin, such as `http://localhost:5173`, under Authorized JavaScript origins. Set that client ID in the server's `GOOGLE_CLIENT_ID` and the client's `VITE_GOOGLE_CLIENT_ID`. New Google accounts are created with the student role. On first Google sign-in with a verified email matching an existing account, its Google ID is saved to that account; its role and password remain unchanged. An account already linked to a different Google ID is rejected.
 
 Registration and login return a user and JWT and set the JWT in an httpOnly `token` cookie. The middleware also accepts a bearer token, supporting clients affected by cross-site cookie restrictions. Passwords are hashed with bcrypt.
 
