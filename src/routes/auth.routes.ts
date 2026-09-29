@@ -6,7 +6,7 @@
  */
 
 import { Router } from 'express';
-import { register, login, getMe, logout } from '../controllers/auth.controller';
+import { register, login, googleLogin, getMe, logout } from '../controllers/auth.controller';
 import { protect } from '../middleware/auth.middleware';
 
 const router = Router();
@@ -67,6 +67,7 @@ router.post('/register', register);
  *         description: Invalid credentials
  */
 router.post('/login', login);
+router.post('/google', googleLogin);
 
 /**
  * @swagger
