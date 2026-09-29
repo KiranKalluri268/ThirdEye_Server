@@ -9,6 +9,7 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import User, { IUser } from '../models/User';
+import { OAuth2Client } from 'google-auth-library';
 
 /** Cookie options shared across auth endpoints */
 const COOKIE_OPTIONS = {
@@ -105,7 +106,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
+    const isMatch = user.password ? await bcrypt.compare(password, user.password) : false;
     if (!isMatch) {
       res.status(401).json({ success: false, message: 'Invalid email or password' });
       return;
@@ -121,6 +122,61 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error during login' });
+  }
+};
+
+/** Verify a Google ID token and exchange it for the app's normal session. */
+export const googleLogin = async (req: Request, res: Response): Promise<void> => {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  if (!clientId) {
+    res.status(503).json({ success: false, message: 'Google sign-in is not configured' });
+    return;
+  }
+  const credential = req.body?.credential;
+  if (typeof credential !== 'string' || !credential) {
+    res.status(400).json({ success: false, message: 'Google credential is required' });
+    return;
+  }
+  try {
+    const ticket = await new OAuth2Client(clientId).verifyIdToken({ idToken: credential, audience: clientId });
+    const profile = ticket.getPayload();
+    if (!profile?.sub || !profile.email || !profile.email_verified) {
+      res.status(401).json({ success: false, message: 'Google account email is not verified' });
+      return;
+    }
+    let user = await User.findOne({ googleId: profile.sub });
+    if (!user) {
+      const email = profile.email.toLowerCase();
+      const existing = await User.findOne({ email });
+      if (existing) {
+        if (existing.googleId && existing.googleId !== profile.sub) {
+          res.status(409).json({ success: false, message: 'This account is linked to a different Google account' });
+          return;
+        }
+        user = existing.googleId ? existing : await User.findOneAndUpdate(
+          { _id: existing._id, googleId: { $exists: false } },
+          { $set: { googleId: profile.sub } },
+          { new: true }
+        );
+        if (!user) {
+          res.status(409).json({ success: false, message: 'This account was linked to another Google account' });
+          return;
+        }
+      } else {
+        user = await User.create({
+          name: profile.name || email.split('@')[0],
+          email,
+          googleId: profile.sub,
+          role: 'student',
+          avatarColor: generateAvatarColor(),
+        });
+      }
+    }
+    const token = signToken(user._id.toString(), user.role);
+    res.cookie('token', token, COOKIE_OPTIONS);
+    res.json({ success: true, token, user: { _id: user._id, name: user.name, email: user.email, role: user.role, avatarColor: user.avatarColor } });
+  } catch (error) {
+    res.status(401).json({ success: false, message: 'Invalid Google credential' });
   }
 };
 

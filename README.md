@@ -63,6 +63,7 @@ Check the service at `GET http://localhost:5000/api/health`. In development, bro
 | `JWT_SECRET` | Yes | Secret used to sign and verify JWTs | Use a long random value |
 | `JWT_EXPIRES_IN` | No | JWT lifetime accepted by `jsonwebtoken` | `7d` |
 | `CLIENT_URL` | Yes in production | Exact allowed browser origin for REST and Socket.IO CORS | `http://localhost:5173` |
+| `GOOGLE_CLIENT_ID` | For Google sign-in | Google OAuth web client ID used to verify ID tokens | Same as client setting |
 | `NODE_ENV` | No | Enables production cookie behavior and hides Swagger | `development` |
 
 Do not commit `.env`. In production, `CLIENT_URL` must include the scheme and host and must not contain a path. When `NODE_ENV=production`, cookies are `Secure`, `httpOnly`, and `SameSite=None`, so both applications must use HTTPS.
@@ -89,6 +90,8 @@ Mongoose creates collections and declared indexes as models are used. Production
 
 ## Authentication and authorization
 
+Google sign-in uses a Google OAuth Web application client ID. Configure its consent screen and add the frontend origin, such as `http://localhost:5173`, under Authorized JavaScript origins. Set that client ID in the server's `GOOGLE_CLIENT_ID` and the client's `VITE_GOOGLE_CLIENT_ID`. New Google accounts are created with the student role. On first Google sign-in with a verified email matching an existing account, its Google ID is saved to that account; its role and password remain unchanged. An account already linked to a different Google ID is rejected.
+
 Registration and login return a user and JWT and set the JWT in an httpOnly `token` cookie. The middleware also accepts a bearer token, supporting clients affected by cross-site cookie restrictions. Passwords are hashed with bcrypt.
 
 Roles are `student`, `instructor`, and `admin`:
@@ -110,6 +113,7 @@ All endpoints return JSON. Protected endpoints require authentication.
 | `GET` | `/api/health` | Public | Health and timestamp |
 | `POST` | `/api/auth/register` | Public | Create a user and sign in |
 | `POST` | `/api/auth/login` | Public | Verify credentials and sign in |
+| `POST` | `/api/auth/google` | Public | Verify Google ID token and sign in |
 | `GET` | `/api/auth/me` | Authenticated | Current user |
 | `POST` | `/api/auth/logout` | Authenticated | Clear the authentication cookie |
 
@@ -201,4 +205,3 @@ src/
 
 - [System architecture](docs/ARCHITECTURE.md)
 - [Socket.IO real-time events](docs/REALTIME_EVENTS.md)
-
